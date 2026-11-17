@@ -1,0 +1,10 @@
+const $=s=>document.querySelector(s), loginBox=$('#loginBox'), dashboard=$('#dashboard');
+function msg(el,text,error=false){el.textContent=text;el.className='message'+(error?' error':'')}
+async function api(url,opts={}){const r=await fetch(url,opts);let d={};try{d=await r.json()}catch{}if(!r.ok)throw Error(d.error||'حدث خطأ');return d}
+async function refresh(){const data=await api('/api/apps');$('#adminApps').innerHTML=data.length?data.map(a=>`<div class="admin-item"><div><b>${esc(a.name)}</b><small>الإصدار ${esc(a.version)} · ${esc(a.category)} · ${(a.size/1048576).toFixed(1)} MB</small></div><button class="danger" data-delete="${a.id}">حذف</button></div>`).join(''):'<p class="muted">ماكو تطبيقات منشورة بعد.</p>'}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+async function boot(){try{const s=await api('/api/session');loginBox.hidden=s.authenticated;dashboard.hidden=!s.authenticated;if(s.authenticated)await refresh()}catch{}}
+$('#loginForm').addEventListener('submit',async e=>{e.preventDefault();const el=$('#loginMsg');try{await api('/api/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(new FormData(e.target))});e.target.reset();await boot()}catch(err){msg(el,err.message,true)}});
+$('#appForm').addEventListener('submit',async e=>{e.preventDefault();const el=$('#uploadMsg');msg(el,'جاري الرفع...');try{await api('/api/apps',{method:'POST',body:new FormData(e.target)});e.target.reset();msg(el,'تم نشر التطبيق بنجاح');await refresh()}catch(err){msg(el,err.message,true)}});
+$('#adminApps').addEventListener('click',async e=>{const id=e.target.dataset.delete;if(!id)return;if(!confirm('متأكد تريد تحذف هذا التطبيق؟'))return;try{await api('/api/apps/'+id,{method:'DELETE'});await refresh()}catch(err){alert(err.message)}});
+$('#logout').addEventListener('click',async()=>{await api('/api/logout',{method:'POST'});await boot()});boot();
